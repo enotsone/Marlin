@@ -31,7 +31,7 @@
  * Basic settings can be found in Configuration.h
  *
  */
-#define CONFIGURATION_ADV_H_VERSION 020006
+#define CONFIGURATION_ADV_H_VERSION 020007
 
 // @section temperature
 
@@ -126,9 +126,19 @@
   #define HEATER_BED_INVERTING true
 #endif
 
-/**
- * Heated Chamber settings
- */
+//
+// Heated Bed Bang-Bang options
+//
+#if DISABLED(PIDTEMPBED)
+  #define BED_CHECK_INTERVAL 5000   // (ms) Interval between checks in bang-bang control
+  #if ENABLED(BED_LIMIT_SWITCHING)
+    #define BED_HYSTERESIS 2        // (°C) Only set the relevant heater state when ABS(T-target) > BED_HYSTERESIS
+  #endif
+#endif
+
+//
+// Heated Chamber options
+//
 #if TEMP_SENSOR_CHAMBER
   #define CHAMBER_MINTEMP             5
   #define CHAMBER_MAXTEMP            60
@@ -136,12 +146,29 @@
   //#define CHAMBER_LIMIT_SWITCHING
   //#define HEATER_CHAMBER_PIN       44   // Chamber heater on/off pin
   //#define HEATER_CHAMBER_INVERTING false
-#endif
+	  
 
-#if DISABLED(PIDTEMPBED)
-  #define BED_CHECK_INTERVAL 5000 // ms between checks in bang-bang control
-  #if ENABLED(BED_LIMIT_SWITCHING)
-    #define BED_HYSTERESIS 2 // Only disable heating if T>target+BED_HYSTERESIS and enable heating if T>target-BED_HYSTERESIS
+  //#define CHAMBER_FAN               // Enable a fan on the chamber
+  #if ENABLED(CHAMBER_FAN)
+    #define CHAMBER_FAN_MODE 2        // Fan control mode: 0=Static; 1=Linear increase when temp is higher than target; 2=V-shaped curve.
+    #if CHAMBER_FAN_MODE == 0
+      #define CHAMBER_FAN_BASE  255   // Chamber fan PWM (0-255)
+    #elif CHAMBER_FAN_MODE == 1
+      #define CHAMBER_FAN_BASE  128   // Base chamber fan PWM (0-255); turns on when chamber temperature is above the target
+      #define CHAMBER_FAN_FACTOR 25   // PWM increase per °C above target
+    #elif CHAMBER_FAN_MODE == 2
+      #define CHAMBER_FAN_BASE  128   // Minimum chamber fan PWM (0-255)
+      #define CHAMBER_FAN_FACTOR 25   // PWM increase per °C difference from target
+    #endif
+  #endif
+
+  //#define CHAMBER_VENT              // Enable a servo-controlled vent on the chamber
+  #if ENABLED(CHAMBER_VENT)
+    #define CHAMBER_VENT_SERVO_NR  1  // Index of the vent servo
+    #define HIGH_EXCESS_HEAT_LIMIT 5  // How much above target temp to consider there is excess heat in the chamber
+    #define LOW_EXCESS_HEAT_LIMIT 3
+    #define MIN_COOLING_SLOPE_TIME_CHAMBER_VENT 20
+    #define MIN_COOLING_SLOPE_DEG_CHAMBER_VENT 1.5
   #endif
 #endif
 
@@ -339,7 +366,7 @@
 #if ENABLED(EXTRUDER_RUNOUT_PREVENT)
   #define EXTRUDER_RUNOUT_MINTEMP 190
   #define EXTRUDER_RUNOUT_SECONDS 30
-  #define EXTRUDER_RUNOUT_SPEED 1500  // (mm/m)
+  #define EXTRUDER_RUNOUT_SPEED 1500  // (mm/min)
   #define EXTRUDER_RUNOUT_EXTRUDE 5   // (mm)
 #endif
 
@@ -783,8 +810,9 @@
   #define TRAMMING_POINT_NAME_3 "Back-Right"
   #define TRAMMING_POINT_NAME_4 "Back-Left"
 
-  // Enable to restore leveling setup after operation
-  #define RESTORE_LEVELING_AFTER_G35
+  #define RESTORE_LEVELING_AFTER_G35    // Enable to restore leveling setup after operation
+  //#define REPORT_TRAMMING_MM          // Report Z deviation (mm) for each point relative to the first
+  //#define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item for Assisted Tramming
 
   /**
    * Screw thread:
@@ -809,24 +837,30 @@
 #define INVERT_Z_STEP_PIN false
 #define INVERT_E_STEP_PIN false
 
-// Default stepper release if idle. Set to 0 to deactivate.
-// Steppers will shut down DEFAULT_STEPPER_DEACTIVE_TIME seconds after the last move when DISABLE_INACTIVE_? is true.
-// Time can be set by M18 and M84.
+/**
+ * Idle Stepper Shutdown
+ * Set DISABLE_INACTIVE_? 'true' to shut down axis steppers after an idle period.
+ * The Deactive Time can be overridden with M18 and M84. Set to 0 for No Timeout.
+ */
 #define DEFAULT_STEPPER_DEACTIVE_TIME 120
 #define DISABLE_INACTIVE_X true
 #define DISABLE_INACTIVE_Y true
-#define DISABLE_INACTIVE_Z true  // Set to false if the nozzle will fall down on your printed part when print has finished.
+#define DISABLE_INACTIVE_Z true  // Set 'false' if the nozzle could fall onto your printed part!
 #define DISABLE_INACTIVE_E true
 
-#define DEFAULT_MINIMUMFEEDRATE       0.0     // minimum feedrate
-#define DEFAULT_MINTRAVELFEEDRATE     0.0
+// If the Nozzle or Bed falls when the Z stepper is disabled, set its resting position here.
+//#define Z_AFTER_DEACTIVATE Z_HOME_POS
 
 //#define HOME_AFTER_DEACTIVATE  // Require rehoming after steppers are deactivated
 
-// Minimum time that a segment needs to take if the buffer is emptied
-#define DEFAULT_MINSEGMENTTIME        20000   // (µs)
+// Default Minimum Feedrates for printing and travel moves
+#define DEFAULT_MINIMUMFEEDRATE       0.0     // (mm/s) Minimum feedrate. Set with M205 S.
+#define DEFAULT_MINTRAVELFEEDRATE     0.0     // (mm/s) Minimum travel feedrate. Set with M205 T.
 
-// Slow down the machine if the look ahead buffer is (by default) half full.
+// Minimum time that a segment needs to take as the buffer gets emptied
+#define DEFAULT_MINSEGMENTTIME        20000   // (µs) Set with M205 B.
+
+// Slow down the machine if the lookahead buffer is (by default) half full.
 // Increase the slowdown divisor for larger buffer sizes.
 #define SLOWDOWN
 #if ENABLED(SLOWDOWN)
@@ -877,7 +911,7 @@
       // increments while checking for the contact to be broken.
       #define BACKLASH_MEASUREMENT_LIMIT       0.5   // (mm)
       #define BACKLASH_MEASUREMENT_RESOLUTION  0.005 // (mm)
-      #define BACKLASH_MEASUREMENT_FEEDRATE    Z_PROBE_SPEED_SLOW // (mm/m)
+      #define BACKLASH_MEASUREMENT_FEEDRATE    Z_PROBE_SPEED_SLOW // (mm/min)
     #endif
   #endif
 #endif
@@ -1090,24 +1124,29 @@
   #define BOOTSCREEN_TIMEOUT 4000        // (ms) Total Duration to display the boot screen(s)
 #endif
 
-#if HAS_GRAPHICAL_LCD && EITHER(SDSUPPORT, LCD_SET_PROGRESS_MANUALLY)
-  //#define PRINT_PROGRESS_SHOW_DECIMALS // Show progress with decimal digits
-  //#define SHOW_REMAINING_TIME          // Display estimated time to completion
+#if EITHER(SDSUPPORT, LCD_SET_PROGRESS_MANUALLY) && ANY(HAS_MARLINUI_U8GLIB, HAS_MARLINUI_HD44780, IS_TFTGLCD_PANEL)
+																			 
+  //#define SHOW_REMAINING_TIME       // Display estimated time to completion
   #if ENABLED(SHOW_REMAINING_TIME)
-    //#define USE_M73_REMAINING_TIME     // Use remaining time from M73 command instead of estimation
-    //#define ROTATE_PROGRESS_DISPLAY    // Display (P)rogress, (E)lapsed, and (R)emaining time
+    //#define USE_M73_REMAINING_TIME  // Use remaining time from M73 command instead of estimation
+    //#define ROTATE_PROGRESS_DISPLAY // Display (P)rogress, (E)lapsed, and (R)emaining time
   #endif
-#endif
+	  
 
-#if HAS_CHARACTER_LCD && EITHER(SDSUPPORT, LCD_SET_PROGRESS_MANUALLY)
-  //#define LCD_PROGRESS_BAR              // Show a progress bar on HD44780 LCDs for SD printing
-  #if ENABLED(LCD_PROGRESS_BAR)
-    #define PROGRESS_BAR_BAR_TIME 2000    // (ms) Amount of time to show the bar
-    #define PROGRESS_BAR_MSG_TIME 3000    // (ms) Amount of time to show the status message
-    #define PROGRESS_MSG_EXPIRE   0       // (ms) Amount of time to retain the status message (0=forever)
-    //#define PROGRESS_MSG_ONCE           // Show the message for MSG_TIME then clear it
-    //#define LCD_PROGRESS_BAR_TEST       // Add a menu item to test the progress bar
+  #if HAS_MARLINUI_U8GLIB
+    //#define PRINT_PROGRESS_SHOW_DECIMALS // Show progress with decimal digits
   #endif
+
+  #if EITHER(HAS_MARLINUI_HD44780, IS_TFTGLCD_PANEL)
+    //#define LCD_PROGRESS_BAR            // Show a progress bar on HD44780 LCDs for SD printing
+    #if ENABLED(LCD_PROGRESS_BAR)
+      #define PROGRESS_BAR_BAR_TIME 2000  // (ms) Amount of time to show the bar
+      #define PROGRESS_BAR_MSG_TIME 3000  // (ms) Amount of time to show the status message
+      #define PROGRESS_MSG_EXPIRE   0     // (ms) Amount of time to retain the status message (0=forever)
+      //#define PROGRESS_MSG_ONCE         // Show the message for MSG_TIME then clear it
+      //#define LCD_PROGRESS_BAR_TEST     // Add a menu item to test the progress bar
+    #endif
+	#endif
 #endif
 
 #if ENABLED(SDSUPPORT)
@@ -1131,7 +1170,7 @@
 
   //#define MENU_ADDAUTOSTART               // Add a menu option to run auto#.g files
 
-  #define EVENT_GCODE_SD_STOP "G28XY"       // G-code to run on Stop Print (e.g., "G28XY" or "G27")
+  #define EVENT_GCODE_SD_ABORT "G28XY"      // G-code to run on SD Abort Print (e.g., "G28XY" or "G27")
 
   #if ENABLED(PRINTER_EVENT_LEDS)
     #define PE_LEDS_COMPLETED_TIME  (30*60) // (seconds) Time to keep the LED "done" color before restoring normal illumination
@@ -1309,9 +1348,9 @@
  * controller events, as there is a trade-off between reliable
  * printing performance versus fast display updates.
  */
-#if HAS_GRAPHICAL_LCD
+#if HAS_MARLINUI_U8GLIB
   // Show SD percentage next to the progress bar
-  #define DOGM_SD_PERCENT
+  //#define DOGM_SD_PERCENT
 
   // Save many cycles by drawing a hollow frame or no frame on the Info Screen
   //#define XYZ_NO_FRAME
@@ -1379,19 +1418,19 @@
   //#define MARLIN_SNAKE
   //#define GAMES_EASTER_EGG          // Add extra blank lines above the "Games" sub-menu
 
-#endif // HAS_GRAPHICAL_LCD
+#endif // HAS_MARLINUI_U8GLIB
 
 //
 // Additional options for DGUS / DWIN displays
 //
 #if HAS_DGUS_LCD
-  #define DGUS_SERIAL_PORT 3
-  #define DGUS_BAUDRATE 115200
+  #define LCD_SERIAL_PORT 3
+  #define LCD_BAUDRATE 115200
 
   #define DGUS_RX_BUFFER_SIZE 128
   #define DGUS_TX_BUFFER_SIZE 48
-  //#define DGUS_SERIAL_STATS_RX_BUFFER_OVERRUNS  // Fix Rx overrun situation (Currently only for AVR)
-
+  //#define SERIAL_STATS_RX_BUFFER_OVERRUNS  // Fix Rx overrun situation (Currently only for AVR)
+  
   #define DGUS_UPDATE_INTERVAL_MS  500    // (ms) Interval between automatic screen updates
 
   #if EITHER(DGUS_LCD_UI_FYSETC, DGUS_LCD_UI_HIPRECY)
@@ -1511,7 +1550,7 @@
 //
 // FSMC Graphical TFT
 //
-#if ENABLED(FSMC_GRAPHICAL_TFT)
+#if TFT_SCALED_DOGLCD
   //#define TFT_MARLINUI_COLOR 0xFFFF // White
   //#define TFT_MARLINBG_COLOR 0x0000 // Black
   //#define TFT_DISABLED_COLOR 0x0003 // Almost black
@@ -1556,6 +1595,7 @@
 #if ENABLED(BABYSTEPPING)
   //#define INTEGRATED_BABYSTEPPING         // EXPERIMENTAL integration of babystepping into the Stepper ISR
   //#define BABYSTEP_WITHOUT_HOMING
+  //#define BABYSTEP_ALWAYS_AVAILABLE       // Allow babystepping at all times (not just during movement).
   //#define BABYSTEP_XY                     // Also enable X/Y Babystepping. Not supported on DELTA!
   #define BABYSTEP_INVERT_Z false           // Change if Z babysteps should go the other way
   //#define BABYSTEP_MILLIMETER_UNITS       // Specify BABYSTEP_MULTIPLICATOR_(XY|Z) in mm instead of micro-steps
@@ -1566,8 +1606,7 @@
   #if ENABLED(DOUBLECLICK_FOR_Z_BABYSTEPPING)
     #define DOUBLECLICK_MAX_INTERVAL 1250   // Maximum interval between clicks, in milliseconds.
                                             // Note: Extra time may be added to mitigate controller latency.
-    //#define BABYSTEP_ALWAYS_AVAILABLE     // Allow babystepping at all times (not just during movement).
-    //#define MOVE_Z_WHEN_IDLE              // Jump to the move Z menu on doubleclick when printer is idle.
+   //#define MOVE_Z_WHEN_IDLE              // Jump to the move Z menu on doubleclick when printer is idle.
     #if ENABLED(MOVE_Z_WHEN_IDLE)
       #define MOVE_Z_IDLE_MULTIPLICATOR 1   // Multiply 1mm by this factor for the move step size.
     #endif
@@ -1960,7 +1999,7 @@
  * Universal tool change settings.
  * Applies to all types of extruders except where explicitly noted.
  */
-#if EXTRUDERS > 1
+#if HAS_MULTI_EXTRUDER
   // Z raise distance for tool-change, as needed for some extruders
   #define TOOLCHANGE_ZRAISE                 2 // (mm)
   //#define TOOLCHANGE_ZRAISE_BEFORE_RETRACT  // Apply raise before swap retraction (if enabled)
@@ -1978,13 +2017,13 @@
     // Load / Unload
     #define TOOLCHANGE_FS_LENGTH              12  // (mm) Load / Unload length
     #define TOOLCHANGE_FS_EXTRA_RESUME_LENGTH  0  // (mm) Extra length for better restart, fine tune by LCD/Gcode)
-    #define TOOLCHANGE_FS_RETRACT_SPEED   (50*60) // (mm/m) (Unloading)
-    #define TOOLCHANGE_FS_UNRETRACT_SPEED (25*60) // (mm/m) (On SINGLENOZZLE or Bowden loading must be slowed down)
+    #define TOOLCHANGE_FS_RETRACT_SPEED   (50*60) // (mm/min) (Unloading)
+    #define TOOLCHANGE_FS_UNRETRACT_SPEED (25*60) // (mm/min) (On SINGLENOZZLE or Bowden loading must be slowed down)
 
     // Longer prime to clean out a SINGLENOZZLE
     #define TOOLCHANGE_FS_EXTRA_PRIME          0  // (mm) Extra priming length
-    #define TOOLCHANGE_FS_PRIME_SPEED    (4.6*60) // (mm/m) Extra priming feedrate
-    #define TOOLCHANGE_FS_WIPE_RETRACT         0  // (mm/m) Retract before cooling for less stringing, better wipe, etc.
+    #define TOOLCHANGE_FS_PRIME_SPEED    (4.6*60) // (mm/min) Extra priming feedrate
+    #define TOOLCHANGE_FS_WIPE_RETRACT         0  // (mm/min) Retract before cooling for less stringing, better wipe, etc.
 
     // Cool after prime to reduce stringing
     #define TOOLCHANGE_FS_FAN                 -1  // Fan index or -1 to skip
@@ -2024,7 +2063,7 @@
     //#define TOOLCHANGE_PARK_X_ONLY          // X axis only move
     //#define TOOLCHANGE_PARK_Y_ONLY          // Y axis only move
   #endif
-#endif // EXTRUDERS > 1
+#endif // HAS_MULTI_EXTRUDER
 
 /**
  * Advanced Pause

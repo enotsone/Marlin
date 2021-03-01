@@ -36,7 +36,7 @@
  * Advanced settings can be found in Configuration_adv.h
  *
  */
-#define CONFIGURATION_H_VERSION 020006
+#define CONFIGURATION_H_VERSION 020007
 
 //===========================================================================
 //============================= Getting Started =============================
@@ -71,7 +71,7 @@
 // @section info
 
 // Author info of this build printed to the host during boot and M115
-#define STRING_CONFIG_H_AUTHOR "(MDK, 081820" // Who made the changes.
+#define STRING_CONFIG_H_AUTHOR "(MDK, 030121" // Who made the changes.
 //#define CUSTOM_VERSION_FILE Version.h // Path from the root directory (no quotes)
 
 /**
@@ -89,10 +89,10 @@
 #define SHOW_BOOTSCREEN
 
 // Show the bitmap in Marlin/_Bootscreen.h on startup.
-#define SHOW_CUSTOM_BOOTSCREEN
+//#define SHOW_CUSTOM_BOOTSCREEN
 
 // Show the bitmap in Marlin/_Statusscreen.h on the status screen.
-#define CUSTOM_STATUS_SCREEN_IMAGE
+//#define CUSTOM_STATUS_SCREEN_IMAGE
 
 // @section machine
 
@@ -331,7 +331,7 @@
 //#define PSU_NAME "Power Supply"
 
 #if ENABLED(PSU_CONTROL)
-  #define PSU_ACTIVE_HIGH false     // Set 'false' for ATX, 'true' for X-Box
+  #define PSU_ACTIVE_STATE LOW     // Set 'LOW' for ATX, 'HIGH' for X-Box
 
   //#define PSU_DEFAULT_OFF         // Keep power off until enabled directly with M80
   //#define PSU_POWERUP_DELAY 250   // (ms) Delay for the PSU to warm up to full power
@@ -391,6 +391,7 @@
  *    21 : Pt100 with circuit in the Ultimainboard V2.x with 3.3v excitation (STM32 \ LPC176x....)
  *    22 : 100k (hotend) with 4.7k pullup to 3.3V and 220R to analog input (as in GTM32 Pro vB)
  *    23 : 100k (bed) with 4.7k pullup to 3.3v and 220R to analog input (as in GTM32 Pro vB)
+ *    30 : Kis3d Silicone heating mat 200W/300W with 6mm precision cast plate (EN AW 5083) NTC100K / B3950 (4.7k pullup) 
  *   201 : Pt100 with circuit in Overlord, similar to Ultimainboard V2.x
  *    60 : 100k Maker's Tool Works Kapton Bed Thermistor beta=3950
  *    61 : 100k Formbot / Vivedino 3950 350C thermistor 4.7k pullup
@@ -433,6 +434,12 @@
 // Dummy thermistor constant temperature readings, for use with 998 and 999
 #define DUMMY_THERMISTOR_998_VALUE 25
 #define DUMMY_THERMISTOR_999_VALUE 100
+
+// Resistor values when using a MAX31865 (sensor -5)
+// Sensor value is typically 100 (PT100) or 1000 (PT1000)
+// Calibration value is typically 430 ohm for AdaFruit PT100 modules and 4300 ohm for AdaFruit PT1000 modules.
+//#define MAX31865_SENSOR_OHMS      100
+//#define MAX31865_CALIBRATION_OHMS 430
 
 // Use temp sensor 1 as a redundant sensor with sensor 0. If the readings
 // from the two sensors differ too much the print will be aborted.
@@ -566,6 +573,7 @@
   #define DEFAULT_bedKp 58.57
   #define DEFAULT_bedKi 10.51
   #define DEFAULT_bedKd 217.50						  
+
 
   // FIND YOUR OWN: "M303 E-1 C8 S90" to run autotune on the bed at 90 degreesC for 8 cycles.
 #endif // PIDTEMPBED
@@ -1184,6 +1192,7 @@
  */
 #define FILAMENT_RUNOUT_SENSOR
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+  #define FIL_RUNOUT_ENABLED_DEFAULT true // Enable the sensor on startup. Override with M412 followed by M500.												   
   #define NUM_RUNOUT_SENSORS   1     // Number of sensors, up to one per extruder. Define a FIL_RUNOUT#_PIN for each.
   #define FIL_RUNOUT_STATE     HIGH   // Pin state indicating that filament is NOT present.
   #define FIL_RUNOUT_PULLUP          // Use internal pullup for filament runout pins.
@@ -1520,8 +1529,8 @@
 #define PREHEAT_1_FAN_SPEED     0 // Value from 0 to 255
 
 #define PREHEAT_2_LABEL       "ABS"
-#define PREHEAT_2_TEMP_HOTEND 250
-#define PREHEAT_2_TEMP_BED    80
+#define PREHEAT_2_TEMP_HOTEND 220
+#define PREHEAT_2_TEMP_BED    100
 #define PREHEAT_2_FAN_SPEED     0 // Value from 0 to 255
 
 /**
@@ -1648,6 +1657,36 @@
  */
 //#define PRINTCOUNTER
 
+/**
+ * Password
+ *
+ * Set a numerical password for the printer which can be requested:
+ *
+ *  - When the printer boots up
+ *  - Upon opening the 'Print from Media' Menu
+ *  - When SD printing is completed or aborted
+ *
+ * The following G-codes can be used:
+ *
+ *  M510 - Lock Printer. Blocks all commands except M511.
+ *  M511 - Unlock Printer.
+ *  M512 - Set, Change and Remove Password.
+ *
+ * If you forget the password and get locked out you'll need to re-flash
+ * the firmware with the feature disabled, reset EEPROM, and (optionally)
+ * re-flash the firmware again with this feature enabled.
+ */
+//#define PASSWORD_FEATURE
+#if ENABLED(PASSWORD_FEATURE)
+  #define PASSWORD_LENGTH 4                 // (#) Number of digits (1-9). 3 or 4 is recommended
+  #define PASSWORD_ON_STARTUP
+  #define PASSWORD_UNLOCK_GCODE             // Unlock with the M511 P<password> command. Disable to prevent brute-force attack.
+  #define PASSWORD_CHANGE_GCODE             // Change the password with M512 P<old> S<new>.
+  //#define PASSWORD_ON_SD_PRINT_MENU       // This does not prevent gcodes from running
+  //#define PASSWORD_AFTER_SD_PRINT_END
+  //#define PASSWORD_AFTER_SD_PRINT_ABORT
+  //#include "Configuration_Secure.h"       // External file with PASSWORD_DEFAULT_VALUE
+#endif
 //=============================================================================
 //============================= LCD and SD support ============================
 //=============================================================================
